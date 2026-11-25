@@ -1,0 +1,25 @@
+# Dependencies are installed inside the image
+node_modules
+npm-debug.log*
+
+# Secrets - config is injected as environment variables at runtime
+.env
+.env.*
+!.env.example
+
+# Not needed in the image
+tests
+coverage
+jest.config.js
+eslint.config.js
+nodemon.json
+.prettierrc*
+.prettierignore
+README.md
+*.log
+
+# Docker / VCS
+Dockerfile
+.dockerignore
+.git
+.gitignore

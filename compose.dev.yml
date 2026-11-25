@@ -1,0 +1,53 @@
+# Development override: hot reload for both apps, database/redis ports
+# published so local tools (psql, Prisma Studio, redis-cli) can connect.
+#
+#   docker compose -f docker-compose.yml -f compose.dev.yml up --build
+#
+#   Frontend (Vite HMR):  http://localhost:5173
+#   API:                  http://localhost:5000/api
+#   PostgreSQL:           localhost:5434
+#   Redis:                localhost:6379
+
+services:
+  db:
+    ports: ['5434:5432']
+
+  redis:
+    ports: ['6379:6379']
+
+  api:
+    build:
+      target: dev
+    image: task-manager-api:dev
+    environment:
+      NODE_ENV: development
+      CORS_ORIGIN: http://localhost:5173
+      LOG_LEVEL: debug
+      TRUST_PROXY: 0 # browser talks to the API directly in dev
+    ports: ['5000:5000']
+    volumes:
+      - ./backend:/app
+      # Keep the container's node_modules (Linux binaries + generated Prisma
+      # client) instead of the host's.
+      - /app/node_modules
+    # The dev image has no HEALTHCHECK, so use one here for `web` to wait on.
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:5000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+
+  web:
+    build:
+      target: dev
+    image: task-manager-web:dev
+    environment:
+      VITE_API_URL: http://localhost:5000/api
+      CHOKIDAR_USEPOLLING: 'true' # file watching across the Windows bind mount
+    ports: !override ['5173:5173']
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    healthcheck:
+      disable: true

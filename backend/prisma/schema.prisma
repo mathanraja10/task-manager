@@ -1,0 +1,57 @@
+// Prisma schema for the Task Manager.
+// PostgreSQL is the source of truth; Redis only caches read results.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// PostgreSQL orders enum values by declaration order, so sorting by
+// priority gives LOW < MEDIUM < HIGH. Keep these in ascending order.
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(255) // unique constraint creates the lookup index used by login
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  tasks        Task[]
+
+  @@map("users")
+}
+
+model Task {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  title       String       @db.VarChar(200)
+  description String?
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?    @map("due_date") @db.Date
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Every task query is scoped to one user, so user_id leads each index.
+  // See README "Database indexes" for the reasoning.
+  @@index([userId, createdAt]) // default list order (newest/oldest) + FK lookups
+  @@index([userId, status]) // status filter + dashboard counts
+  @@index([userId, dueDate]) // "Due date" sort
+  @@map("tasks")
+}
